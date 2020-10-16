@@ -10,13 +10,12 @@ defmodule EventBus.Manager.Store do
   use GenServer
 
   alias EventBus.Model.Event
-  alias EventBus.Service.Store, as: StoreService
 
   @typep event :: EventBus.event()
   @typep event_shadow :: EventBus.event_shadow()
   @typep topic :: EventBus.topic()
 
-  @backend StoreService
+  @default_backend EventBus.Service.EtsStore
 
   @doc false
   def start_link do
@@ -78,17 +77,13 @@ defmodule EventBus.Manager.Store do
   Fetch an event from the store
   """
   @spec fetch(event_shadow()) :: event() | nil
-  defdelegate fetch(event_shadow),
-    to: @backend,
-    as: :fetch
+  def fetch(event_shadow), do: get_backend().fetch(event_shadow)
 
   @doc """
   Fetch an event's data from the store
   """
   @spec fetch_data(event_shadow()) :: any()
-  defdelegate fetch_data(event_shadow),
-    to: @backend,
-    as: :fetch_data
+  def fetch_data(event_shadow), do: get_backend().fetch_data(event_shadow)
 
   ###########################################################################
   # PRIVATE API
@@ -98,14 +93,14 @@ defmodule EventBus.Manager.Store do
   @spec handle_call({:register_topic, topic()}, any(), term())
     :: {:reply, :ok, term()}
   def handle_call({:register_topic, topic}, _from, state) do
-    @backend.register_topic(topic)
+    get_backend().register_topic(topic)
     {:reply, :ok, state}
   end
 
   @spec handle_call({:unregister_topic, topic()}, any(), term())
     :: {:reply, :ok, term()}
   def handle_call({:unregister_topic, topic}, _from, state) do
-    @backend.unregister_topic(topic)
+    get_backend().unregister_topic(topic)
     {:reply, :ok, state}
   end
 
@@ -113,19 +108,27 @@ defmodule EventBus.Manager.Store do
   @spec handle_call({:exist?, topic()}, any(), term())
     :: {:reply, boolean(), term()}
   def handle_call({:exist?, topic}, _from, state) do
-    {:reply, @backend.exist?(topic), state}
+    {:reply, get_backend().exist?(topic), state}
   end
 
   @doc false
   @spec handle_call({:create, event()}, any(), term()) :: no_return()
   def handle_call({:create, event}, _from, state) do
-    @backend.create(event)
+    get_backend().create(event)
     {:reply, :ok, state}
   end
 
   @spec handle_cast({:delete, event_shadow()}, term()) :: no_return()
   def handle_cast({:delete, {topic, id}}, state) do
-    @backend.delete({topic, id})
+    get_backend().delete({topic, id})
     {:noreply, state}
+  end
+
+  ###########################################################################
+  # DYNAMIC BACKEND LOOKUP
+  ###########################################################################
+
+  defp get_backend() do
+    Application.get_env(:event_bus, :store_backend, @default_backend)
   end
 end

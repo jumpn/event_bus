@@ -1,7 +1,7 @@
-defmodule EventBus.Service.StoreTest do
+defmodule EventBus.Service.EtsStoreTest do
   use ExUnit.Case, async: false
   alias EventBus.Model.Event
-  alias EventBus.Service.Store
+  alias EventBus.Service.EtsStore, as: Store
 
   doctest Store
 
