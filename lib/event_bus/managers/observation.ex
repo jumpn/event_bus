@@ -10,8 +10,6 @@ defmodule EventBus.Manager.Observation do
 
   use GenServer
 
-  alias EventBus.Service.Observation, as: ObservationService
-
   @typep event_shadow :: EventBus.event_shadow()
   @typep subscribers :: EventBus.subscribers()
   @typep subscribers_with_event_shadow :: {subscribers(), event_shadow()}
@@ -19,7 +17,7 @@ defmodule EventBus.Manager.Observation do
   @typep topic :: EventBus.topic()
   @typep watcher :: {subscribers(), subscribers(), subscribers()}
 
-  @backend ObservationService
+  @default_backend EventBus.Service.EtsObservation
 
   @doc false
   def start_link do
@@ -97,9 +95,7 @@ defmodule EventBus.Manager.Observation do
   Fetch the watcher
   """
   @spec fetch(event_shadow()) :: any()
-  defdelegate fetch(event_shadow),
-    to: @backend,
-    as: :fetch
+  def fetch(event_shadow), do: get_backend().fetch(event_shadow)
 
   ###########################################################################
   # PRIVATE API
@@ -109,14 +105,14 @@ defmodule EventBus.Manager.Observation do
   @spec handle_call({:register_topic, topic()}, any(), term())
     :: {:reply, :ok, term()}
   def handle_call({:register_topic, topic}, _from, state) do
-    @backend.register_topic(topic)
+    get_backend().register_topic(topic)
     {:reply, :ok, state}
   end
 
   @spec handle_call({:unregister_topic, topic()}, any(), term())
     :: {:reply, :ok, term()}
   def handle_call({:unregister_topic, topic}, _from, state) do
-    @backend.unregister_topic(topic)
+    get_backend().unregister_topic(topic)
     {:reply, :ok, state}
   end
 
@@ -124,14 +120,14 @@ defmodule EventBus.Manager.Observation do
   @spec handle_call({:exist?, topic()}, any(), term())
     :: {:reply, boolean(), term()}
   def handle_call({:exist?, topic}, _from, state) do
-    {:reply, @backend.exist?(topic), state}
+    {:reply, get_backend().exist?(topic), state}
   end
 
   @doc false
   @spec handle_call({:save, event_shadow(), watcher()}, any(), term())
     :: {:reply, :ok, term()}
   def handle_call({:save, {topic, id}, watcher}, _from, state) do
-    @backend.save({topic, id}, watcher)
+    get_backend().save({topic, id}, watcher)
     {:reply, :ok, state}
   end
 
@@ -139,7 +135,7 @@ defmodule EventBus.Manager.Observation do
   @spec handle_cast({:mark_as_completed, subscriber_with_event_ref()}, term())
     :: no_return()
   def handle_cast({:mark_as_completed, {subscriber, {topic, id}}}, state) do
-    @backend.mark_as_completed({subscriber, {topic, id}})
+    get_backend().mark_as_completed({subscriber, {topic, id}})
     {:noreply, state}
   end
 
@@ -147,7 +143,15 @@ defmodule EventBus.Manager.Observation do
   @spec handle_cast({:mark_as_skipped, subscriber_with_event_ref()}, term())
     :: no_return()
   def handle_cast({:mark_as_skipped, {subscriber, {topic, id}}}, state) do
-    @backend.mark_as_skipped({subscriber, {topic, id}})
+    get_backend().mark_as_skipped({subscriber, {topic, id}})
     {:noreply, state}
+  end
+
+  ###########################################################################
+  # DYNAMIC BACKEND LOOKUP
+  ###########################################################################
+
+  defp get_backend() do
+    Application.get_env(:event_bus, :observation_backend, @default_backend)
   end
 end

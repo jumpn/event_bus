@@ -1,7 +1,9 @@
 defmodule EventBus.Service.ObservationTest do
   use ExUnit.Case, async: false
 
-  alias EventBus.Service.{Observation, Topic}
+  alias EventBus.Service.EtsObservation, as: Observation
+  alias EventBus.Service.Topic
+
   alias EventBus.Support.Helper.{
     BadOne,
     Calculator,
